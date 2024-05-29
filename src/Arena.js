@@ -1,75 +1,52 @@
-const Player = require('./Player');
-const Die = require('./Die');
-
-/**
- * Represents an arena where players fight.
- */
 class Arena {
-    constructor(player1, player2) {
+    constructor(player1, player2, attackDie, defendDie) {
         this.player1 = player1;
         this.player2 = player2;
+        this.attackDie = attackDie;
+        this.defendDie = defendDie;
     }
 
-    /**
-     * Starts the game.
-     */
-    async startGame() {
-        let attacker = this.player1.getHealth() < this.player2.getHealth() ? this.player1 : this.player2;
-        let defender = attacker === this.player1 ? this.player2 : this.player1;
+    attack(attacker, defender) {
+        const attackRoll = this.attackDie.roll();
+        const defenseRoll = this.defendDie.roll();
 
-        while (attacker.isAlive() && defender.isAlive()) {
-            await this.takeTurn(attacker, defender);
-            [attacker, defender] = [defender, attacker];
+        const attackDamage = attacker.attack * attackRoll;
+        const defenseStrength = defender.strength * defenseRoll;
+
+        const damage = Math.max(0, attackDamage - defenseStrength);
+        defender.reduceHealth(damage);
+
+        console.log(`${attacker.getName()} attacks with roll ${attackRoll} (Damage: ${attackDamage})`);
+        console.log(`${defender.getName()} defends with roll ${defenseRoll} (Defense: ${defenseStrength})`);
+        console.log(`${defender.getName()} takes ${damage} damage, health is now ${defender.getHealth()}\n`);
+    }
+
+    fight() {
+        while (this.player1.isAlive() && this.player2.isAlive()) {
+            if (this.player1.getHealth() <= this.player2.getHealth()) {
+                this.attack(this.player1, this.player2);
+                if (this.player2.isAlive()) {
+                    this.attack(this.player2, this.player1);
+                }
+            } else {
+                this.attack(this.player2, this.player1);
+                if (this.player1.isAlive()) {
+                    this.attack(this.player1, this.player2);
+                }
+            }
         }
-
-        const winner = this.getWinner();
-        console.log(`The winner is: Player ${winner === this.player1 ? 'A' : 'B'}`);
-        process.exit();
     }
 
-    /**
-     * Executes a single turn in the fight.
-     * @param {Player} attacker - The attacking player.
-     * @param {Player} defender - The defending player.
-     */
-    async takeTurn(attacker, defender) {
-        try {
-            const attackRoll = await Die.simulateDieRoll(attacker === this.player1 ? 'Player A' : 'Player B');
-            const defendRoll = await Die.simulateDieRoll(defender === this.player1 ? 'Player A' : 'Player B');
-            
-            this.attack(attacker, defender, attackRoll, defendRoll);
-        } catch (error) {
-            console.error('Error during die roll:', error);
+    startGame() {
+        console.log("The battle begins!");
+
+        this.fight();
+
+        if (this.player1.isAlive()) {
+            console.log(`${this.player1.getName()} wins the battle!`);
+        } else {
+            console.log(`${this.player2.getName()} wins the battle!`);
         }
-    }
-
-    /**
-     * Executes the attack logic.
-     * @param {Player} attacker - The attacking player.
-     * @param {Player} defender - The defending player.
-     * @param {number} attackRoll - The result of the attack die roll.
-     * @param {number} defendRoll - The result of the defense die roll.
-     */
-    attack(attacker, defender, attackRoll, defendRoll) {
-        const attackDamage = attacker.getAttack() * attackRoll;
-        const defendStrength = defender.getStrength() * defendRoll;
-
-        const damage = attackDamage - defendStrength;
-        if (damage > 0) {
-            defender.reduceHealth(damage);
-        }
-
-        console.log(`${attacker === this.player1 ? 'Player A' : 'Player B'} attacked with damage ${attackDamage}`);
-        console.log(`${defender === this.player1 ? 'Player A' : 'Player B'} defended with strength ${defendStrength}`);
-        console.log(`${defender === this.player1 ? 'Player A' : 'Player B'}'s health is now ${defender.getHealth()}\n`);
-    }
-
-    /**
-     * Gets the winner of the fight.
-     * @returns {Player} The winning player.
-     */
-    getWinner() {
-        return this.player1.isAlive() ? this.player1 : this.player2;
     }
 }
 
